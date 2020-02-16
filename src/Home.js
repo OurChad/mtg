@@ -55,15 +55,15 @@ function Home() {
             }).then((response) => response.json())
             .then(({ data, not_found = [] }) => {
                 data.forEach(({ name, image_uris, card_faces }) => {
-                    const { quantity } = cards.find(aCard => aCard.name === name);
                     if (card_faces) {
-                        card_faces.forEach(({ image_uris: { large }}) => dispatch(addCardImages({quantity, img: large})));
-    
-                        return data;
+                        const { quantity } = cards.find(aCard => card_faces.find(cardFace => cardFace.name === aCard.name));
+                        card_faces.forEach(({ image_uris: { large }}) => dispatch(addCardImages({quantity, img: large}))); 
                     } else if (image_uris) {
+                        const { quantity } = cards.find(aCard => aCard.name === name);
                         dispatch(addCardImages({quantity, img: image_uris.large}));
-                        return data;
                     }
+
+                    return data;
                 });
 
                 not_found.forEach(({ name }) => {
