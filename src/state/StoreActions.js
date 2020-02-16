@@ -1,8 +1,9 @@
-export const SET_CARD_IMAGES = 'setCardImages';
+export const ADD_CARD_IMAGES = 'addCardImages';
+export const RESET_CARD_IMAGES = 'resetCardImages';
 
-export const setCardImages = (cardImages) => {
+export const addCardImages = (cardImages) => {
     return {
-        type: SET_CARD_IMAGES,
+        type: ADD_CARD_IMAGES,
         payload: cardImages,
     }
 }

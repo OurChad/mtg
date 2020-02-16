@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { useStore } from './state/StoreContext';
-import { setCardImages } from './state/StoreActions';
+import { addCardImages, RESET_CARD_IMAGES } from './state/StoreActions';
 import { useHistory } from "react-router-dom";
 import styled from 'styled-components';
 import Header from './Header';
@@ -25,59 +25,81 @@ const FileDropZone = styled.div`
     text-align: center;
     min-height: 40vh;
     border: 1px solid black;
+    margin-bottom: 1rem;
 `;
 
 function Home() {
     const [{ cardImages }, dispatch] = useStore();
     const [failedCardSearches, setFailedCardSearches] = useState([]);
+    const [isFetching, setIsFetching] = useState(false);
 
-    const getCardData = useCallback(async (cards) => {
-        const cardPromises = cards.map(({ name, quantity }) => {
+    const getCardCollectionData = useCallback(async (cards) => {
+        const loopIncrement = 70;
+        const cardPromises = [];
+        for(let i = 0; i < cards.length; i += loopIncrement) {
+            const data = {
+                identifiers: [],
+            };
+            if (i + loopIncrement > cards.length) {
+                data.identifiers = cards.slice(i, cards.length);
+            } else {
+                data.identifiers = cards.slice(i, i + loopIncrement);
+            }
 
-        return fetch(`https://api.scryfall.com/cards/named?exact=${name}`, {
-            headers: {
-            'Content-Type': 'application/json',
-            },
-        }).then((response) => response.json())
-            .then((resp) => {
-                const { image_uris, card_faces } = resp;
-                if (card_faces) {
-                    card_faces.forEach(({ image_uris: { large }}) => dispatch(setCardImages({quantity, img: large})));
+            const cardPromise = fetch(`https://api.scryfall.com/cards/collection`, {
+                headers: {
+                'Content-Type': 'application/json',
+                },
+                method: 'POST',
+                body: JSON.stringify(data),
+            }).then((response) => response.json())
+            .then(({ data, not_found = [] }) => {
+                data.forEach(({ name, image_uris, card_faces }) => {
+                    const { quantity } = cards.find(aCard => aCard.name === name);
+                    if (card_faces) {
+                        card_faces.forEach(({ image_uris: { large }}) => dispatch(addCardImages({quantity, img: large})));
+    
+                        return data;
+                    } else if (image_uris) {
+                        dispatch(addCardImages({quantity, img: image_uris.large}));
+                        return data;
+                    }
+                });
 
-                    return resp;
-                } else if (image_uris) {
-                    dispatch(setCardImages({quantity, img: image_uris.large}))
-                    // setCardImages(prevCardImage => [...prevCardImage, {quantity, img: image_uris.large}]);
-                    return resp;
-                }
-                
-                setFailedCardSearches(prevFailedCardSearches => [...prevFailedCardSearches, name]);
+                not_found.forEach(({ name }) => {
+                    setFailedCardSearches(prevFailedCardSearches => [...prevFailedCardSearches, name])
+                });
             })
             .catch(e => console.error(e));
-        });
+            cardPromises.push(cardPromise);
+        };
 
+        setIsFetching(true);
         await Promise.allSettled(cardPromises);
+        setIsFetching(false);
     }, [dispatch, setFailedCardSearches]);
 
-    const upload = useCallback(async (file) => {
+    const uploadCollection = useCallback(async (file) => {
         const text = await file.text();
         const cards = text.split('\n').reduce((acc, t) => {
             if (t.length > 1 && t[0] !== '/') {
-            const cardParts = t.split(' ');
-            const quantity = Number.parseInt(cardParts[0]);
-            cardParts.splice(0, 1);
-            const card = {
-                quantity,
-                name: cardParts.reduce((acc, p) => acc ? `${acc}+${p}` : p, "")
-            }
-            return [...acc, card];
+                const cardParts = t.split(' ');
+                const subStringStartIndex = cardParts[0].length + 1;
+                const quantity = Number.parseInt(cardParts[0]);
+                cardParts.splice(0, 1);
+                const card = {
+                    quantity,
+                    name: t.substring(subStringStartIndex).trim(),
+                }
+                return [...acc, card];
             }
 
             return acc;
-        },[])
-        console.table(cards);
-        getCardData(cards);
-    }, [getCardData]);
+        },[]);
+
+        dispatch({type: RESET_CARD_IMAGES});
+        getCardCollectionData(cards);
+    }, [dispatch, getCardCollectionData]);
 
     let history = useHistory();
 
@@ -88,14 +110,22 @@ function Home() {
     const handleFileInputOnChange = useCallback((e) => {
         const file = e.target.files[0];
 
-        upload(file);
-    }, [upload]);
+        uploadCollection(file);
+    }, [uploadCollection]);
 
     const handleDrop = useCallback((e) => {
         e.preventDefault();
+        const fileInput = document.getElementById('deckFile');
+        const { files } = e.dataTransfer
+        const isTxtFile = files[0].type === 'text/plain';
 
-        upload(e.dataTransfer.files[0]);
-    }, [upload]);
+        if (files.length > 1 || !isTxtFile) {
+            return;
+        }
+
+        fileInput.files = e.dataTransfer.files;
+        uploadCollection(e.dataTransfer.files[0]);
+    }, [uploadCollection]);
 
     const handleDragOver = useCallback((e) => {
         e.preventDefault();
@@ -107,7 +137,16 @@ function Home() {
             <StyledMain>
                 <FileDropZone onDrop={handleDrop} onDragOver={handleDragOver}>
                 <h2>Choose a file to upload or drag and drop a file here</h2>
-                <FileInput id="deckFile" type="file" onChange={handleFileInputOnChange}/>
+                <FileInput 
+                    id="deckFile" 
+                    type="file"
+                    accept=".txt"
+                    onChange={handleFileInputOnChange} 
+                    disabled={isFetching} 
+                />
+                {
+                    isFetching ? <h2>Searching for Cards...</h2> : null
+                }
                 </FileDropZone>
                 {
                     cardImages.length <= 0 ? null : (
