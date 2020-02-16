@@ -149,14 +149,14 @@ function Home() {
                 }
                 </FileDropZone>
                 {
-                    cardImages.length <= 0 ? null : (
+                    isFetching || cardImages.length <= 0 ? null : (
                         <Button type="button" onClick={handleProxyButtonClock}>
                             Proxy Deck
                         </Button>
                     )
                 }
                 {
-                    failedCardSearches.length <= 0 ? null :
+                    isFetching || failedCardSearches.length <= 0 ? null :
                     (
                         <div>
                         <h2>Failed to find the following cards</h2>
