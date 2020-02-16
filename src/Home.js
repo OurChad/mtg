@@ -56,8 +56,13 @@ function Home() {
             .then(({ data, not_found = [] }) => {
                 data.forEach(({ name, image_uris, card_faces }) => {
                     if (card_faces) {
-                        const { quantity } = cards.find(aCard => card_faces.find(cardFace => cardFace.name === aCard.name));
-                        card_faces.forEach(({ image_uris: { large }}) => dispatch(addCardImages({quantity, img: large}))); 
+                        // Some cards like Far // Away have card_faces but only one side so single image_uris
+                        const { quantity } = cards.find(aCard => aCard.name === name || card_faces.find(cardFace => cardFace.name === aCard.name));
+                        if (image_uris) {
+                            dispatch(addCardImages({quantity, img: image_uris.large}));
+                        } else {
+                            card_faces.forEach(({ image_uris: { large }}) => dispatch(addCardImages({quantity, img: large}))); 
+                        }
                     } else if (image_uris) {
                         const { quantity } = cards.find(aCard => aCard.name === name);
                         dispatch(addCardImages({quantity, img: image_uris.large}));
