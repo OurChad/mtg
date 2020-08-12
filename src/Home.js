@@ -64,7 +64,7 @@ function Home() {
                             card_faces.forEach(({ image_uris: { large }}) => dispatch(addCardImages({quantity, img: large}))); 
                         }
                     } else if (image_uris) {
-                        const { quantity } = cards.find(aCard => aCard.name === name);
+                        const { quantity = 1 } = cards.find(aCard => aCard.name === name) ?? {};
                         dispatch(addCardImages({quantity, img: image_uris.large}));
                     }
 
